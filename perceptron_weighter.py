@@ -33,6 +33,21 @@ class Perceptron:
         return inp_str.translate( str.maketrans( dict.fromkeys(punctuation) ) )
 
 
+    def format_sentence(self, sentence):
+        return self.remove_punc(sentence).strip().split()
+
+
+    def extract_features(self, words, word_index, head_index):
+        
+        # setup the feature vector and format the input sentence
+        self.feat_vec = [0 for i in range( self.vec_len )]
+        print("TEST FEATURE VEC:", self.feat_vec)
+        
+        # insert feature extraction here
+
+        return self.feat_vec
+
+    
     def gen_edge_weight(self, sentence_list, word_idx, head_idx):
         """
         Takes a list of strings and two integers for arguments where the integers
@@ -42,11 +57,8 @@ class Perceptron:
         """
         
         # generate a vector for the target edge
-
-        #for dummy in range(self.vec_len):
-            # word, head = sentence_list[word_idx], sentence_list[head_idx]
-            #set features of edge vector based on words in the sent_list
-            #pass
+        # under construction
+        #self.edge_vec = self.extract_features(sentence_list, word_idx, head_idx)
         
         # generates random vector of binary values for placeholder
         self.edge_vec = np.array([random.choice([0, 1]) for i in range(self.vec_len)])
@@ -78,7 +90,7 @@ class Perceptron:
         # vectorize the incoming sentence
         print("ORIGINAL SENTENCE:", sentence)
         
-        self.sent_list = self.remove_punc(sentence).strip().split()
+        self.sent_list = self.format_sentence(sentence)
         
         print("FORMATTED SENT:", self.sent_list, '\n')
         
@@ -113,6 +125,10 @@ if __name__ == "__main__":
     print("\nFINAL EDGE WEIGHT MATRIX:\n")
     for row in out_weights:
         print(row)
+    
+    print('\n')
+    dog_vector = my_percep.extract_features(my_percep.format_sentence(dog_sent), 0, 1)
+    print("DOG VECTOR:", dog_vector)
 
     
     # Import the training and test data
