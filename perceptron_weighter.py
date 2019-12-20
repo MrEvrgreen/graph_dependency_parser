@@ -31,68 +31,68 @@ class Perceptron:
         return self.remove_punc(sentence).strip().split()
 
 
-    def get_features(self, filename):
+    def _get_context_feats(self, child_data_idx, child_id, parent_id, train_data):
         
-        def _get_context_feats(child_data_idx, child_id, parent_id, train_data):
-            
-            # calculate the data index of the parent node based on its ID
-            parent_data_idx = int(child_data_idx) + (int(parent_id) - int(child_id))
+        # calculate the data index of the parent node based on its ID
+        parent_data_idx = int(child_data_idx) + (int(parent_id) - int(child_id))
+        
+        
+        child_pos = train_data[ child_data_idx ].strip().split()[3]
+        
+        if parent_id == "0":
+            parent_pos = None
+            parent_l_neighbor_pos = None
+                
+        else:
+            # if the parent is a compound word, ignore it and continue
+            temp = train_data[ parent_data_idx ].strip().split()
+            if '-' in temp[0]:
+                parent_pos = train_data[ parent_data_idx+1 ].strip().split()[3]
+            else:
+                parent_pos = train_data[ parent_data_idx ].strip().split()[3]
 
-
-            child_pos = train_data[ child_data_idx ].strip().split()[3]
-
-            if parent_id == "0":
-                parent_pos = None
+                
+            # check before accessing parent's left neighbor POS
+            temp_data = train_data[parent_data_idx-1].strip().split()
+            if len( temp_data ) > 2 and temp_data[0] != '#':
+                parent_l_neighbor_pos = temp_data[3]
+            else:
                 parent_l_neighbor_pos = None
-                
-            else:
-                # if the parent is a compound word, ignore it and continue
-                temp = train_data[ parent_data_idx ].strip().split()
-                if '-' in temp[0]:
-                    parent_pos = train_data[ parent_data_idx+1 ].strip().split()[3]
-                else:
-                    parent_pos = train_data[ parent_data_idx ].strip().split()[3]
 
-                
-                # check before accessing parent's left neighbor POS
-                temp_data = train_data[parent_data_idx-1].strip().split()
-                if len( temp_data ) > 2 and temp_data[0] != '#':
-                    parent_l_neighbor_pos = temp_data[3]
-                else:
-                    parent_l_neighbor_pos = None
+            #if parent_pos not in self.UDP_TAGS:
+                #print("PROBLEMATIC TEMP DATA:", train_data[parent_data_idx], "PARENT ID:", parent_id)
 
-                #if parent_pos not in self.UDP_TAGS:
-                    #print("PROBLEMATIC TEMP DATA:", train_data[parent_data_idx], "PARENT ID:", parent_id)
+        # check before accessing parent's right neighbor POS
+        temp_data = train_data[parent_data_idx+1].strip().split()
+        if len( temp_data ) > 2 and temp_data[0] != '#':
+            parent_r_neighbor_pos = temp_data[3]
+        else:
+            parent_r_neighbor_pos = None
+        
+        # check before accessing child's left neighbor POS
+        temp_data = train_data[child_data_idx-1].strip().split()
+        if len( temp_data ) > 2 and temp_data[0] != '#':
+            child_l_neighbor_pos = temp_data[3]
+        else:
+            child_l_neighbor_pos = None
+        
+        # check before accessing child's right neighbor POS
+        temp_data = train_data[child_data_idx+1].strip().split()
+        if len( temp_data ) > 2:
+            child_r_neighbor_pos = temp_data[3]
+        else:
+            child_r_neighbor_pos = None
 
-            # check before accessing parent's right neighbor POS
-            temp_data = train_data[parent_data_idx+1].strip().split()
-            if len( temp_data ) > 2 and temp_data[0] != '#':
-                parent_r_neighbor_pos = temp_data[3]
-            else:
-                parent_r_neighbor_pos = None
-            
-            # check before accessing child's left neighbor POS
-            temp_data = train_data[child_data_idx-1].strip().split()
-            if len( temp_data ) > 2 and temp_data[0] != '#':
-                child_l_neighbor_pos = temp_data[3]
-            else:
-                child_l_neighbor_pos = None
-            
-            # check before accessing child's right neighbor POS
-            temp_data = train_data[child_data_idx+1].strip().split()
-            if len( temp_data ) > 2:
-                child_r_neighbor_pos = temp_data[3]
-            else:
-                child_r_neighbor_pos = None
+        return [parent_l_neighbor_pos, parent_pos, parent_r_neighbor_pos,
+                child_l_neighbor_pos, child_pos, child_r_neighbor_pos]
 
-            return [parent_l_neighbor_pos, parent_pos, parent_r_neighbor_pos,
-                    child_l_neighbor_pos, child_pos, child_r_neighbor_pos]
 
+    def get_features(self, filename):
         
         # !DIGITS represents numbers
         # !X represents unknown words (not in corpus)
         self.vocab_list = {"!DIGITS": 0, "!X": 0}
-        self.bigram_list = {}
+        self.bigram_dict = {}
         self.context_feat_list_one = {}
         self.context_feat_list_two = {}
         self.context_feat_list_three = {}
@@ -131,10 +131,10 @@ class Perceptron:
             if not next_line:
                 pass
             else:
-                self.bigram_list[ ( current_line[1].lower(), next_line[1].lower() ) ] = 0
+                self.bigram_dict[ ( current_line[1].lower(), next_line[1].lower() ) ] = 0
 
             # add context feature combinations
-            context_feats = _get_context_feats(i, current_line[0], current_line[6], train_data)
+            context_feats = self._get_context_feats(i, current_line[0], current_line[6], train_data)
             
             feat_one = tuple([context_feats[1], context_feats[2], context_feats[3], context_feats[4]])
             feat_two = tuple([context_feats[0], context_feats[1], context_feats[3], context_feats[4]])
@@ -151,20 +151,23 @@ class Perceptron:
                 self.context_feat_list_four[ feat_four ] = 0
 
         print("\nVOCAB LEN:", len(self.vocab_list))
-        print("BIGRAM LEN:", len(self.bigram_list))
+        print("BIGRAM LEN:", len(self.bigram_dict))
         print("SPECIAL FEATURES LEN:", len(self.context_feat_list_one) + \
             len(self.context_feat_list_two) + \
             len(self.context_feat_list_three) + \
             len(self.context_feat_list_four))
 
+        # calculate the total vector len based on extracted feature vectors 
         self.total_vec_len = len(self.vocab_list)*2 + 1 + \
-            len(self.UDP_TAGS)*2 + len(self.bigram_list) +\
+            len(self.UDP_TAGS)*2 + len(self.bigram_dict) +\
             len(self.context_feat_list_one) + \
             len(self.context_feat_list_two) + \
             len(self.context_feat_list_three) + \
             len(self.context_feat_list_four)
-
-        print("TOTAL VEC LEN:", self.total_vec_len)
+        
+        # add one more to total vec len for feat representing distance
+        # between parent and child in sentence
+        self.total_vec_len += 1; print("TOTAL VEC LEN:", self.total_vec_len)
 
         self.weights = [ 0 for i in range(self.total_vec_len) ]
     
@@ -172,12 +175,12 @@ class Perceptron:
     def extract_features(self, sent_list, child_index, parent_index):
         """
         Takes a list of strings and two integers for arguments where
-        the list of strings is the tokenized sentence and the integers
-        represent the indices of the word and head of the edge to be weighted
-        in the given sentence.
+        the list of strings is the dependencies formatted sentence 
+        and the integers represent the indices of the word and head
+        respectively for the edge to be weighted in the given sentence.
         
         # example:
-        # final example feature representation of arc:
+        # final example for sparse feature representation of arc:
         # [ word1vec + direction + word2vec + word1posvec + word2posvec + \
         #   bigram_feats + context_feats + dist_between ]
         # 
@@ -190,44 +193,101 @@ class Perceptron:
         ADJ	ADP PUNCT ADV AUX SYM INTJ CCONJ X NOUN DET PROPN NUM VERB PART PRON SCONJ
         """
         # setup the feature vector and format the input sentence
-        self.feat_vec = []
+        self.feat_vec = []; print("ORIGINAL FEAT VEC:", self.feat_vec) # delete later
         self.parent_info = sent_list[parent_index].split()
         self.child_info = sent_list[child_index].split()
         
         # insert feature extraction here
-        print("WORD:", self.child_info[1], 
+        print("WORD:", self.child_info[1],
               '\nHEAD:', self.parent_info[1])
         
         # establish child, parent, and direction vectors
         self.child_vec = copy.deepcopy(self.vocab_list)
         self.child_vec[ self.child_info[1].lower() ] = 1
+        self.feat_vec = self.feat_vec + list(self.child_vec.values()); print("FEAT VEC W/ CHILD VEC", len(self.feat_vec)) # delete later
 
         self.direction = 1 if parent_index < child_index else 0
         
         self.parent_vec = copy.deepcopy(self.vocab_list)
         self.parent_vec[ self.parent_info[1].lower() ] = 1
+        self.feat_vec = self.feat_vec + list(self.parent_vec.values()); print("FEAT VEC W/ PARENT VEC:", len(self.feat_vec))
 
         # establish POS vectors for parent and child
         self.childpos_vec = [ 0 for i in range(len(self.UDP_TAGS)) ]
         self.childpos_vec[ self.UDP_TAGS.index( self.child_info[3] ) ] = 1
+        self.feat_vec = self.feat_vec + self.childpos_vec; print("FEAT VEC W/ CHILDPOS VEC", len(self.feat_vec))
 
         self.parentpos_vec = [ 0 for i in range(len(self.UDP_TAGS)) ]
         self.parentpos_vec[ self.UDP_TAGS.index(self.parent_info[3]) ] = 1
+        self.feat_vec = self.feat_vec + self.parentpos_vec; print("FEAT VEC W/ PARENTPOS VEC", len(self.feat_vec))
 
         # establish bigram features
-        self.bigram_feats = copy.deepcopy(self.bigram_list)
+        self.bigram_feats = copy.deepcopy(self.bigram_dict)
         self.temp_bigram = (self.parent_info[1].lower(),
                             self.child_info[1].lower() )
-        if self.temp_bigram in self.bigram_list:
+        if self.temp_bigram in self.bigram_dict:
             self.bigram_feats[self.temp_bigram] = 1
 
-        # establish context features #####################################################
+        self.feat_vec = self.feat_vec + list(self.bigram_dict.values())
+
+        # establish context features #
+        # [parent_l_neighbor_pos, parent_pos, parent_r_neighbor_pos,
+        #  child_l_neighbor_pos, child_pos, child_r_neighbor_pos]
+        try:
+            parent_l_neighbor_pos = sent_list[parent_index-1].split()[3]
+        except IndexError:
+            parent_l_neighbor_pos = None
+
+        parent_pos = self.parent_info[3]
+
+        try:
+            parent_r_neighbor_pos = sent_list[parent_index+1].split()[3]
+        except IndexError:
+            parent_r_neighbor_pos = None
+
+        try:
+            child_l_neighbor_pos = sent_list[child_index-1].split()[3]
+        except IndexError:
+            child_l_neighbor_pos = None
         
+        child_pos = self.child_info[3]
+
+        try:
+            child_r_neighbor_pos = sent_list[child_index+1].split()[3]
+        except IndexError:
+            child_r_neighbor_pos = None
+
+        feat_one = (parent_pos, parent_r_neighbor_pos, child_l_neighbor_pos, child_pos)
+        feat_two = (parent_l_neighbor_pos, parent_pos, child_l_neighbor_pos, child_pos)
+        feat_three = (parent_pos, parent_r_neighbor_pos, child_pos, child_r_neighbor_pos)
+        feat_four = (parent_l_neighbor_pos, parent_pos, child_pos, child_r_neighbor_pos)
+        
+        temp_one = copy.deepcopy(self.context_feat_list_one)
+        temp_two = copy.deepcopy(self.context_feat_list_two)
+        temp_three = copy.deepcopy(self.context_feat_list_three)
+        temp_four = copy.deepcopy(self.context_feat_list_four)
+
+        if feat_one in temp_one:
+            temp_one[feat_one] = 1
+        if feat_two in temp_two:
+            temp_two[feat_two] = 1
+        if feat_three in temp_three:
+            temp_three[feat_three] = 1
+        if feat_four in temp_four:
+            temp_four[feat_four] = 1
+        
+        self.feat_vec = self.feat_vec + list(temp_one.values()) + \
+            list(temp_two.values()) + \
+            list(temp_three.values()) +\
+            list(temp_four.values())
+
+        print("TEST:", self.parent_info[0], self.child_info[0], "RESULT:", str( abs( int(self.parent_info[0]) - int(self.child_info[0]) ) ) )        
+        self.feat_vec.append( abs( int(self.parent_info[0]) - int(self.child_info[0]) ) )
 
         return self.feat_vec
     
     
-    def gen_edge_weight(self, sentence_list, word_idx, head_idx):
+    def gen_edge_weight(self, sentence_list, child_idx, parent_idx):
         """
         Takes a list of strings and two integers for arguments where
         the list of strings is the tokenized sentence and the integers
@@ -241,10 +301,10 @@ class Perceptron:
         # under construction
 
         # UPDATE FINAL TWO ARGUMENTS TO CORRECT POS's WHEN FIXING FUNCTION
-        self.edge_vec = self.extract_features(sentence_list, word_idx, head_idx, "DET", "NOUN")
+        self.edge_vec = self.extract_features(sentence_list, child_idx, parent_idx)
                     
         # perceptron summation
-        print("EDGE VEC from {} to {}:".format(word_idx, head_idx), self.edge_vec)
+        print("EDGE VEC from {} to {}:".format(child_idx, parent_idx), self.edge_vec)
                     
         self.total = sum(self.edge_vec * self.weights)
 
@@ -312,7 +372,8 @@ if __name__ == "__main__":
     
     # testing section
     test_vec = my_percep.extract_features(sheep_sent, 4, 5)
-    print("TEST VEC:", test_vec)
+    print("TEST VEC:", len(test_vec))
+    print("ONES:", test_vec.count(1))
 
 
     #out_weights = my_percep.gen_edge_weight_matrix(dog_sent)
@@ -321,13 +382,6 @@ if __name__ == "__main__":
     #for row in out_weights:
         #print(row)
     
-    #print('\n')
-    #dog_vector = my_percep.extract_features(my_percep.format_sentence(dog_sent), 0, 1)
-    
-    
-    # Import the training and test data
-    pass
-
     # train the weighter and tagger
     pass
 
