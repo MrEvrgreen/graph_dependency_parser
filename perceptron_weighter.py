@@ -156,7 +156,7 @@ class Perceptron:
             
         
         self.weights = np.random.rand(len(self.feature_library))
-        print("SHAPE:", self.weights.shape)
+        
         #for k, v in self.feature_library.items():
             #print(k, ":", v)
 
@@ -353,17 +353,17 @@ if __name__ == "__main__":
     # testing section
     my_percep = Perceptron()
     my_percep.extract_corpus_feats(training_filename)
-    print("FEAT LEN:", len(my_percep.feature_library))
+    print("WEIGHTS LENGTH:", my_percep.weights.shape)
     
     
     test_vec = my_percep.extract_features(sheep_sent, 2, 4)
     print("TEST VEC:", len(test_vec))
     unique, counts = np.unique(test_vec, return_counts=True)
-    print("COUNTS:", dict(zip(unique, counts)))
+    print("TEST VECTOR VALUE COUNTS:", dict(zip(unique, counts)))
     
     edge_weights = my_percep.gen_edge_weight_list(sheep_sent)
     
-    print()
+    print("\n EDGES:")
     for edge in edge_weights:
         print(edge)
     
