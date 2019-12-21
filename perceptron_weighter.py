@@ -154,10 +154,11 @@ class Perceptron:
             add_new_feat("p-pos-1 p-pos c-pos c-pos+1",
                          p_pos_prev, p_pos, c_pos, c_pos_next)
             
-            self.weights = np.random.rand(1, len(self.feature_library))
-            
-            #for k, v in self.feature_library.items():
-                #print(k, ":", v)
+        
+        self.weights = np.random.rand(len(self.feature_library))
+        print("SHAPE:", self.weights.shape)
+        #for k, v in self.feature_library.items():
+            #print(k, ":", v)
 
 
     def extract_features(self, sent_list, child_index, parent_index):
