@@ -7,6 +7,7 @@ import copy
 import random
 import numpy as np
 from string import punctuation
+from collections import defaultdict
 
 # create the perceptron class
 class Perceptron:
@@ -17,7 +18,7 @@ class Perceptron:
         """
         # create the weight array and other necessary variables
         self.weights = list()
-        self.feature_library = {"!X":0} #!X represents unknown tokens
+        self.feature_library = {"!X":0, "bias": 0} #!X represents unknown tokens
         self.START = "!START"
         self.END = "!END"
         self.UDP_TAGS = ["ADJ", "ADP", "PUNCT", "ADV", "AUX", "SYM", "INTJ",
@@ -161,7 +162,7 @@ class Perceptron:
             #print(k, ":", v)
 
 
-    def extract_features(self, sent_list, child_index, parent_index):
+    def extract_features(self, sent_list, parent_index, child_index):
         """
         Takes a list of strings in universal dependencies format and
         two integers where the two integers represent the indices (not IDs)
@@ -271,7 +272,7 @@ class Perceptron:
         return np.array(list(features.values()))
     
     
-    def gen_edge_weight(self, sentence_list, child_idx, parent_idx):
+    def gen_edge_weight(self, sentence_list, parent_idx, child_idx):
         """
         Takes a list of strings and two integers for arguments where
         the list of strings is the tokenized sentence and the integers
@@ -282,19 +283,19 @@ class Perceptron:
         """
         
         # generate a vector for the target edge
-        edge_vec = self.extract_features(sentence_list, child_idx, parent_idx)
+        edge_vec = self.extract_features(sentence_list, parent_idx, child_idx)
                     
         # perceptron summation                    
         total = sum(edge_vec * self.weights)
 
-        # returns random feature vector of target edge as placeholder
+        # returns weight of target edge
         return total
 
 
     def gen_edge_weight_list(self, sent_list):
         """
-        Takes the self and a list of strings in Universal Dependencies foormat
-        for arguments where the string represents a target sentence 
+        Takes the self and a list of strings in Universal Dependencies format
+        for arguments where the string represents a target sentence
         to be dependency parsed.
         
         Returns a 2D matrix where each row represents the 
@@ -321,14 +322,88 @@ class Perceptron:
                 if c_idx == p_idx:
                     continue
 
-                edge_weights.append([c_idx, p_idx, 
-                                     self.gen_edge_weight(sent_list, 
-                                                          c_idx, 
-                                                          p_idx)])
+                # subtract one from p-idx and c-idx to get node # in sentence
+                edge_weights.append((p_idx-1, c_idx-1,
+                                     self.gen_edge_weight(sent_list,
+                                                          p_idx,
+                                                          c_idx)))
                         
         return edge_weights
-                
         
+        
+    def hasCycleUtil(self, current_node, visited, recStack):
+
+        # set the current node as having been visited
+        # and add it to the recursive stack
+        visited[current_node] = True
+        recStack[current_node] = True
+        
+
+        return
+    
+    
+    def hasCycle(self, vertices, edges):
+        """
+        takes itself, a list of vertices (integers), and edges (tuples of length 3) for arguments
+        returns true if graph has a cycle and false otherwise.
+        """
+        
+        self.V = vertices
+
+        visited = [False] * len(self.V)
+        recStack = [False] * len(self.V)
+        for node in range(len(self.V)):
+            if visited[node] == False:
+                if self.hasCycleUtil(node, visited, recStack) == True:
+                    return True
+        return False
+
+
+    def parse_sentence(self, sent_list):
+        """
+        Takes a sentence list in CoNLL-U Format and its self for arguments.
+        Returns a 2D List of edges (parent, child) representing the dependency parsed version of the sentence.
+        """
+
+        # a dictionary where each key is the target child node and each value returns a parent, weight tuple
+        # i.e. self.graph[child_node] = (parent_node, edge_weight)
+        self.graph = defaultdict(list)
+        self.num_of_nodes = int(sent_list[-1][0])
+        self.nodes = list(range(self.num_of_nodes + 1)) # +1 added for root node
+        
+        # turn sentence into fully-connected graph
+        self.all_possible_edges = self.gen_edge_weight_list(sent_list)
+
+        print("\n EDGES:")
+        for edge in self.all_possible_edges:
+            print(edge)
+
+        # sort edges based on the weights from highest weights to lowest weights
+        self.all_possible_edges = sorted(self.all_possible_edges, key=lambda edg: edg[2], reverse=True)
+    
+        print("\n EDGES SORTED BY WEIGHT:")
+        for edge in self.all_possible_edges:
+            print(edge)
+
+        #####################################################################################################
+        ## add highest weight edge for a child node to final graph but skip if it creates cycle
+        self.i = 1
+        while len(self.graph) < self.num_of_nodes:
+            self.temp = self.all_possible_edges.pop(0) # pull highest-weight edge from list
+            if self.i == self.temp[1] and self.i not in self.graph:
+                self.graph[self.i] = (self.temp[0], self.temp[2])
+                self.i += 1
+
+
+
+
+        ## create code for checking if cycles are present then continue kruskal's here
+        
+
+        return
+
+        
+
 if __name__ == "__main__":
     
     # change directory to current file's directory
@@ -356,16 +431,23 @@ if __name__ == "__main__":
     print("WEIGHTS LENGTH:", my_percep.weights.shape)
     
     
-    test_vec = my_percep.extract_features(sheep_sent, 2, 4)
+    test_vec = my_percep.extract_features(sheep_sent, 4, 2)
     print("TEST VEC:", len(test_vec))
     unique, counts = np.unique(test_vec, return_counts=True)
     print("TEST VECTOR VALUE COUNTS:", dict(zip(unique, counts)))
     
-    edge_weights = my_percep.gen_edge_weight_list(sheep_sent)
+    parsed_sentence = my_percep.parse_sentence(sheep_sent)
     
-    print("\n EDGES:")
-    for edge in edge_weights:
-        print(edge)
+    print("\n\nPARSED SENTENCE:", parsed_sentence)
+    
+    
+    
+    # use weights to generate a tree with maximal spanning algorithm (prim's, kruskal's, etc.)
+    
+    # create cycle detection function for graphs
+    
+
+    # for training, error is the number of words in the sentence with the wrong head
     
     # train the weighter and tagger
     pass
